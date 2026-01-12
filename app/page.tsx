@@ -46,6 +46,24 @@ const CLASS_STATS = {
   },
 };
 
+const OFFICE_NAMES = [
+  "K.Somchai",
+  "P'Nid",
+  "Nong'May",
+  "Boss John",
+  "Manager A",
+  "Dev Best",
+  "AE Pink",
+  "Acc Joy",
+  "HR Bee",
+  "Intern Art",
+  "P'Lek",
+  "K.Somsak",
+  "Nong'Fah",
+  "Des'Nut",
+  "K.Pranee",
+];
+
 // --- 2. COMPONENTS ---
 
 // ส่วนต่อสู้ (Battle Scene)
@@ -72,19 +90,24 @@ function BattleScene({
     { id: string; type: PlayerClassType; hp: number; name: string }[]
   >([]);
 
-  // Init Party on Mount
+  // Init Party on Mount (3 Friends)
   useEffect(() => {
-    const friendTypes = (["A", "B", "C", "D"] as PlayerClassType[])
-      .filter((t) => t !== playerClass)
+    // Random pool of classes
+    const pool = ["A", "B", "C", "D", "A", "B", "C", "D"] as PlayerClassType[];
+    const friendTypes = pool
+      .filter((t) => t !== playerClass || Math.random() > 0.5)
       .sort(() => 0.5 - Math.random())
-      .slice(0, 2);
+      .slice(0, 3);
+
+    // Pick random names
+    const shuffledNames = [...OFFICE_NAMES].sort(() => 0.5 - Math.random());
 
     setFriends(
       friendTypes.map((t, i) => ({
         id: `f${i}`,
         type: t,
         hp: CLASS_STATS[t].maxHp,
-        name: `Colleague ${i + 1}`,
+        name: shuffledNames[i],
       }))
     );
   }, [playerClass]);
@@ -104,10 +127,8 @@ function BattleScene({
       addLog(`${playerName} attacked! Dealt ${dmg} damage.`);
       setEffect("💥");
     } else if (action === "SPECIAL") {
-      // Logic for simplicity
       if (playerClass === "A") {
         // Tank
-        // For simple demo, just deal damage + log
         dmg = currentStats.atk;
         addLog(`${playerName} used Refuse Request! Blocked next attack!`);
         setBossHp((prev) => Math.max(0, prev - dmg));
@@ -145,7 +166,6 @@ function BattleScene({
   useEffect(() => {
     if (turn === "FRIENDS") {
       let totalDmg = 0;
-      let logMsg = "";
 
       friends.forEach((f) => {
         const fStats = CLASS_STATS[f.type];
@@ -155,7 +175,7 @@ function BattleScene({
 
       setTimeout(() => {
         setBossHp((prev) => Math.max(0, prev - totalDmg));
-        addLog(`Party attacked! Total ${totalDmg} damage.`);
+        addLog(`Party (3 members) attacked! Total ${totalDmg} damage.`);
 
         if (bossHp - totalDmg <= 0) {
           setTurn("WIN");
@@ -173,9 +193,6 @@ function BattleScene({
         // Attack Player (Primary)
         const dmg = 15 + Math.floor(Math.random() * 10);
         setPlayerHp((prev) => Math.max(0, prev - dmg));
-
-        // Attack Friends (Randomly)
-        // (Just visual for now, friends don't die in this simple version)
 
         addLog(`Monday uses "Urgent Meeting"! ${playerName} took ${dmg} dmg.`);
 
@@ -214,22 +231,24 @@ function BattleScene({
       </div>
 
       {/* BATTLE FIELD */}
-      <div className="flex justify-between items-end mb-4 px-4">
-        {/* Friends */}
-        <div className="flex gap-2">
-          {friends.map((f) => (
-            <div key={f.id} className="text-center opacity-80">
-              <div className="text-2xl">{CLASS_STATS[f.type].emoji}</div>
-              <div className="text-[8px] text-slate-400">{CLASS_STATS[f.type].name}</div>
+      <div className="grid grid-cols-4 gap-2 mb-4 px-2 items-end">
+        {/* Friends (3) */}
+        {friends.map((f) => (
+          <div key={f.id} className="text-center group">
+            <div className="text-2xl group-hover:scale-110 transition">
+              {CLASS_STATS[f.type].emoji}
             </div>
-          ))}
-        </div>
+            <div className="text-[9px] text-yellow-200 mt-1 font-bold">{f.name}</div>
+            <div className="text-[7px] text-slate-400">{CLASS_STATS[f.type].name}</div>
+          </div>
+        ))}
 
         {/* Player */}
-        <div className="text-center relative z-10 scale-125 origin-bottom">
-          <div className="text-4xl">{stats.emoji}</div>
-          <div className="text-xs text-yellow-400 font-bold">{playerName}</div>
-          <div className="text-[10px] text-green-400">{playerHp} HP</div>
+        <div className="text-center relative z-10 scale-110 origin-bottom bg-slate-700/50 p-2 rounded border border-yellow-500/30">
+          <div className="text-3xl">{stats.emoji}</div>
+          <div className="text-[10px] text-yellow-400 font-bold mt-1">{playerName}</div>
+          <div className="text-[8px] text-purple-300">{stats.name}</div>
+          <div className="text-[9px] text-green-400 font-bold">{playerHp} HP</div>
         </div>
       </div>
 
@@ -353,7 +372,7 @@ export default function OfficeRPG() {
     const soul = `${resultMapping.souls[q2]} + ${resultMapping.realDesires[q4]}`;
     const advice = resultMapping.realAdvice[q4];
 
-    return { charClass, strategy, soul, advice, playerClass: q1 };
+    return { charClass, strategy, soul, advice, playerClass: q1, q4Value: q4 };
   };
 
   const result = getResult();
@@ -419,34 +438,61 @@ export default function OfficeRPG() {
           {/* Header */}
           <div className="bg-purple-900/50 p-4 border-b border-purple-500/30 text-center">
             <h2 className="text-xl font-bold text-yellow-400 tracking-wider uppercase">
-              Your Destiny Revealed
+              The Grand Reveal
             </h2>
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* RPG Sheet */}
-            <div className="bg-black/30 p-6 rounded-lg border border-yellow-500/30 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-2 opacity-20 text-6xl">🛡️</div>
-              <h2 className="text-xl text-yellow-400 font-bold uppercase mb-4 border-b border-yellow-500/30 pb-2">
-                {result.charClass.title}
+          <div className="p-6 space-y-8">
+            {/* ส่วนที่ 1: Character Sheet (RPG Style) */}
+            <div className="bg-black/30 p-6 rounded-lg border-2 border-yellow-500/50 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10 text-8xl grayscale">🛡️</div>
+              <h2 className="text-xl text-yellow-400 font-bold uppercase mb-4 border-b border-yellow-500/30 pb-2 flex items-center gap-2">
+                <span>📜</span> Character Sheet:{" "}
+                <span className="text-white">{result.charClass.title}</span>
               </h2>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <p>
-                  <span className="text-purple-400 font-bold">Player:</span>{" "}
-                  <span className="text-white">{playerName}</span>
+                  <span className="text-purple-400 font-bold">📊 STR (จุดแข็ง):</span> <br />
+                  <span className="text-slate-200 ml-6 block mt-1">{result.charClass.str}</span>
                 </p>
                 <p>
-                  <span className="text-purple-400 font-bold">STR:</span> {result.charClass.str}
+                  <span className="text-purple-400 font-bold">❤️ Soul (สิ่งที่หล่อเลี้ยงใจ):</span>{" "}
+                  <br />
+                  <span className="text-slate-200 ml-6 block mt-1">{result.soul}</span>
                 </p>
                 <div className="bg-red-900/20 p-3 rounded border border-red-500/20 mt-2">
-                  <p className="text-red-400 text-sm font-bold">⚔️ Monday Strategy:</p>
-                  <p className="text-slate-300 text-sm">{result.strategy}</p>
+                  <p className="text-red-400 text-sm font-bold">🛡️ Monday Strategy:</p>
+                  <p className="text-slate-300 text-sm mt-1">{result.strategy}</p>
                 </div>
               </div>
             </div>
 
+            {/* Separator */}
+            <hr className="border-slate-700/50" />
+
+            {/* ส่วนที่ 2: Real World Reflection (Warm & Polite) */}
+            <div className="bg-white/5 p-6 rounded-lg border border-emerald-500/30">
+              <h3 className="text-lg text-emerald-400 font-bold mb-4 flex items-center gap-2">
+                <span>🌱</span> Real World Reflection
+              </h3>
+              <ul className="space-y-4 text-slate-300 text-sm">
+                <li>
+                  <strong className="text-white block mb-1">ตัวตนของคุณ:</strong>
+                  {result.charClass.realSelf}
+                </li>
+                <li>
+                  <strong className="text-white block mb-1">สิ่งที่คุณต้องการจริงๆ:</strong>
+                  {resultMapping.realDesires[result.q4Value as "A" | "B" | "C" | "D"]}
+                </li>
+                <li className="bg-emerald-900/20 p-3 rounded border border-emerald-500/20">
+                  <strong className="text-emerald-300 block mb-1">คำแนะนำสำหรับวันจันทร์:</strong>
+                  {result.advice}
+                </li>
+              </ul>
+            </div>
+
             {/* Action Buttons */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 pt-4">
               <button
                 onClick={startBattle}
                 className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold py-4 rounded-lg shadow-lg transform transition hover:scale-105 flex items-center justify-center gap-2"
@@ -455,7 +501,7 @@ export default function OfficeRPG() {
               </button>
               <button
                 onClick={resetGame}
-                className="text-slate-400 hover:text-white underline text-sm mt-2"
+                className="text-slate-400 hover:text-white underline text-sm mt-2 text-center"
               >
                 🔄 เล่นใหม่อีกครั้ง (Re-roll)
               </button>
