@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { questions, resultMapping } from "@/lib/gameData";
+import { motion } from "framer-motion";
 
 // --- 1. DATA & CONFIG ---
 type PlayerClassType = "A" | "B" | "C" | "D";
@@ -50,57 +51,83 @@ const CLASS_STATS = {
 // ส่วนต่อสู้ (Battle Scene)
 function BattleScene({
   playerClass,
+  playerName,
   onRestart,
 }: {
   playerClass: PlayerClassType;
+  playerName: string;
   onRestart: () => void;
 }) {
   const stats = CLASS_STATS[playerClass];
 
+  // Game State
   const [bossHp, setBossHp] = useState(500);
   const [playerHp, setPlayerHp] = useState(stats.maxHp);
-  const [turn, setTurn] = useState<"PLAYER" | "ENEMY" | "WIN" | "LOSE">("PLAYER");
-  const [logs, setLogs] = useState<string[]>(["Battle Start! Boss Monday appears!"]);
+  const [turn, setTurn] = useState<"PLAYER" | "FRIENDS" | "ENEMY" | "WIN" | "LOSE">("PLAYER");
+  const [logs, setLogs] = useState<string[]>(["Battle Start! You and your party vs Monday!"]);
   const [effect, setEffect] = useState("");
 
-  const addLog = (msg: string) => setLogs((prev) => [msg, ...prev].slice(0, 3));
+  // Party State
+  const [friends, setFriends] = useState<
+    { id: string; type: PlayerClassType; hp: number; name: string }[]
+  >([]);
+
+  // Init Party on Mount
+  useEffect(() => {
+    const friendTypes = (["A", "B", "C", "D"] as PlayerClassType[])
+      .filter((t) => t !== playerClass)
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 2);
+
+    setFriends(
+      friendTypes.map((t, i) => ({
+        id: `f${i}`,
+        type: t,
+        hp: CLASS_STATS[t].maxHp,
+        name: `Colleague ${i + 1}`,
+      }))
+    );
+  }, [playerClass]);
+
+  const addLog = (msg: string) => setLogs((prev) => [msg, ...prev].slice(0, 4));
 
   // Player Action
   const handleAction = (action: "ATTACK" | "SPECIAL" | "HEAL") => {
     if (turn !== "PLAYER") return;
 
     let dmg = 0;
+    const currentStats = CLASS_STATS[playerClass];
 
     if (action === "ATTACK") {
-      dmg = stats.atk + Math.floor(Math.random() * 10);
+      dmg = currentStats.atk + Math.floor(Math.random() * 10);
       setBossHp((prev) => Math.max(0, prev - dmg));
-      addLog(`You attacked! Dealt ${dmg} damage.`);
+      addLog(`${playerName} attacked! Dealt ${dmg} damage.`);
       setEffect("💥");
     } else if (action === "SPECIAL") {
-      // Logic สกิลแต่ละอาชีพ
+      // Logic for simplicity
       if (playerClass === "A") {
-        // Tank Block
-        addLog("Skill Activated: Refuse Request! Next attack blocked.");
-        // (Logic block ซับซ้อนนิดนึง ขอละไว้ทำ dmg เบาๆแทนในตัวอย่างง่าย)
-        dmg = stats.atk;
+        // Tank
+        // For simple demo, just deal damage + log
+        dmg = currentStats.atk;
+        addLog(`${playerName} used Refuse Request! Blocked next attack!`);
         setBossHp((prev) => Math.max(0, prev - dmg));
       } else if (playerClass === "B") {
-        // Support Heal
+        // Support
         const heal = 50;
         setPlayerHp((prev) => Math.min(stats.maxHp, prev + heal));
-        addLog("Healed 50 HP with Coffee!");
+        addLog(`${playerName} healed self for 50 HP!`);
         setEffect("✨");
       } else if (playerClass === "C") {
-        // Rogue Crit
-        dmg = stats.atk * 2;
+        // Rogue
+        dmg = currentStats.atk * 2;
         setBossHp((prev) => Math.max(0, prev - dmg));
-        addLog(`Critical Hit! Dealt ${dmg} damage!`);
+        addLog(`${playerName} CRITICAL hit! Dealt ${dmg} dmg.`);
         setEffect("🗡️");
       } else if (playerClass === "D") {
-        // Wizard Nuke
-        dmg = stats.atk * 3;
+        // Wizard
+        dmg = currentStats.atk * 3;
         setBossHp((prev) => Math.max(0, prev - dmg));
-        addLog(`Fireball! Dealt ${dmg} damage!`);
+        addLog(`${playerName} cast Fireball! Dealt ${dmg} dmg.`);
         setEffect("🔥");
       }
     }
@@ -108,23 +135,49 @@ function BattleScene({
     if (bossHp - dmg <= 0) {
       setTurn("WIN");
     } else {
-      setTurn("ENEMY");
+      setTurn("FRIENDS");
     }
 
     setTimeout(() => setEffect(""), 500);
   };
 
-  // Enemy Turn AI
+  // Friends Turn
+  useEffect(() => {
+    if (turn === "FRIENDS") {
+      let totalDmg = 0;
+      let logMsg = "";
+
+      friends.forEach((f) => {
+        const fStats = CLASS_STATS[f.type];
+        const d = fStats.atk + Math.floor(Math.random() * 5);
+        totalDmg += d;
+      });
+
+      setTimeout(() => {
+        setBossHp((prev) => Math.max(0, prev - totalDmg));
+        addLog(`Party attacked! Total ${totalDmg} damage.`);
+
+        if (bossHp - totalDmg <= 0) {
+          setTurn("WIN");
+        } else {
+          setTurn("ENEMY");
+        }
+      }, 1000);
+    }
+  }, [turn, friends, bossHp]);
+
+  // Enemy Turn
   useEffect(() => {
     if (turn === "ENEMY") {
       setTimeout(() => {
-        const dmg = 20 + Math.floor(Math.random() * 15);
-        // Boss Logic actually hits player here.
-        // Note: The original Tank Block logic wasn't fully implemented in the simple version,
-        // but let's keep it simple as per request.
-
+        // Attack Player (Primary)
+        const dmg = 15 + Math.floor(Math.random() * 10);
         setPlayerHp((prev) => Math.max(0, prev - dmg));
-        addLog(`Monday uses "Urgent Meeting"! You take ${dmg} dmg.`);
+
+        // Attack Friends (Randomly)
+        // (Just visual for now, friends don't die in this simple version)
+
+        addLog(`Monday uses "Urgent Meeting"! ${playerName} took ${dmg} dmg.`);
 
         if (playerHp - dmg <= 0) {
           setTurn("LOSE");
@@ -133,11 +186,11 @@ function BattleScene({
         }
       }, 1500);
     }
-  }, [turn, playerHp]);
+  }, [turn, playerHp, playerName]);
 
   return (
     <div
-      className="w-full max-w-lg mx-auto bg-slate-800 p-6 rounded-xl border-4 border-slate-700 shadow-2xl relative overflow-hidden font-mono"
+      className="w-full max-w-2xl mx-auto bg-slate-800 p-6 rounded-xl border-4 border-slate-700 shadow-2xl relative overflow-hidden font-mono"
       style={{ fontFamily: "var(--font-press-start-2p), monospace" }}
     >
       {/* Effect Overlay */}
@@ -160,6 +213,26 @@ function BattleScene({
         <p className="text-xs text-slate-400 mt-1">{bossHp}/500 HP</p>
       </div>
 
+      {/* BATTLE FIELD */}
+      <div className="flex justify-between items-end mb-4 px-4">
+        {/* Friends */}
+        <div className="flex gap-2">
+          {friends.map((f) => (
+            <div key={f.id} className="text-center opacity-80">
+              <div className="text-2xl">{CLASS_STATS[f.type].emoji}</div>
+              <div className="text-[8px] text-slate-400">{CLASS_STATS[f.type].name}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Player */}
+        <div className="text-center relative z-10 scale-125 origin-bottom">
+          <div className="text-4xl">{stats.emoji}</div>
+          <div className="text-xs text-yellow-400 font-bold">{playerName}</div>
+          <div className="text-[10px] text-green-400">{playerHp} HP</div>
+        </div>
+      </div>
+
       {/* LOGS */}
       <div className="bg-black/40 p-2 rounded h-24 overflow-hidden mb-4 border border-slate-600 text-xs text-green-400 flex flex-col justify-end">
         {logs.map((l, i) => (
@@ -169,25 +242,17 @@ function BattleScene({
         ))}
       </div>
 
-      {/* PLAYER */}
+      {/* CONTROLS */}
       <div className="bg-slate-700 p-4 rounded-lg border-t-4 border-yellow-500">
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-4xl">{stats.emoji}</span>
-            <div>
-              <div className="font-bold text-yellow-400 text-sm">{stats.name}</div>
-              <div className="text-[10px] text-slate-300">Class: {playerClass}</div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-bold text-white">
-              {playerHp}/{stats.maxHp}
-            </div>
-            <div className="text-[10px] text-slate-400">HP</div>
+          <div className="text-xs text-slate-300">
+            Turn:{" "}
+            <span className={turn === "PLAYER" ? "text-green-400 font-bold" : "text-slate-500"}>
+              {turn}
+            </span>
           </div>
         </div>
 
-        {/* CONTROLS */}
         {turn === "PLAYER" ? (
           <div className="grid grid-cols-2 gap-2 text-xs">
             <button
@@ -204,9 +269,7 @@ function BattleScene({
             </button>
           </div>
         ) : (
-          <div className="text-center text-slate-400 py-2 animate-pulse text-xs">
-            Waiting for Monday...
-          </div>
+          <div className="text-center text-slate-400 py-2 animate-pulse text-xs">Waiting...</div>
         )}
 
         {/* GAME OVER / WIN */}
@@ -221,7 +284,7 @@ function BattleScene({
             </h2>
             <p className="text-slate-300 text-xs mb-6">
               {turn === "WIN"
-                ? "You have conquered Monday! Have a great week!"
+                ? `${playerName} defeated Monday! Have a great week!`
                 : "Monday defeated you... Try again!"}
             </p>
             <button
@@ -242,9 +305,14 @@ export default function OfficeRPG() {
   const [phase, setPhase] = useState<"START" | "QUIZ" | "RESULT" | "BATTLE">("START");
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [playerName, setPlayerName] = useState("");
 
   // Quiz Handlers
   const handleStart = () => {
+    if (!playerName.trim()) {
+      alert("Please enter your name!");
+      return;
+    }
     setPhase("QUIZ");
     setCurrentQIndex(0);
     setAnswers({});
@@ -269,6 +337,7 @@ export default function OfficeRPG() {
     setPhase("START");
     setAnswers({});
     setCurrentQIndex(0);
+    setPlayerName("");
   };
 
   // Logic การคำนวณผล Result
@@ -296,9 +365,21 @@ export default function OfficeRPG() {
           <div className="text-6xl animate-bounce">🧙‍♂️</div>
           <h1 className="text-4xl font-bold text-yellow-500">Office Oracle RPG</h1>
           <p className="text-slate-300 text-lg">ค้นหาอาชีพของคุณ แล้วไปตบเกรียนวันจันทร์!</p>
+
+          <div className="max-w-xs mx-auto">
+            <input
+              type="text"
+              placeholder="Enter Your Name..."
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full p-3 rounded bg-slate-800 border border-slate-600 focus:border-yellow-500 focus:outline-none text-center text-white placeholder:text-slate-500"
+            />
+          </div>
+
           <button
             onClick={handleStart}
-            className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-3 px-8 rounded-full transform transition hover:scale-105 shadow-[0_0_15px_rgba(234,179,8,0.5)]"
+            disabled={!playerName.trim()}
+            className="bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 font-bold py-3 px-8 rounded-full transform transition hover:scale-105 shadow-[0_0_15px_rgba(234,179,8,0.5)]"
           >
             ⚔️ START ADVENTURE
           </button>
@@ -351,6 +432,10 @@ export default function OfficeRPG() {
               </h2>
               <div className="space-y-3">
                 <p>
+                  <span className="text-purple-400 font-bold">Player:</span>{" "}
+                  <span className="text-white">{playerName}</span>
+                </p>
+                <p>
                   <span className="text-purple-400 font-bold">STR:</span> {result.charClass.str}
                 </p>
                 <div className="bg-red-900/20 p-3 rounded border border-red-500/20 mt-2">
@@ -387,7 +472,11 @@ export default function OfficeRPG() {
           >
             &lt; Back to Results
           </button>
-          <BattleScene playerClass={result.playerClass} onRestart={resetGame} />
+          <BattleScene
+            playerClass={result.playerClass}
+            playerName={playerName}
+            onRestart={resetGame}
+          />
         </div>
       )}
     </div>
